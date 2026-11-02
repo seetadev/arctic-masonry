@@ -24,9 +24,12 @@ export function columnCountFor(width, breakpoints = DEFAULT_BREAKPOINTS) {
   return columns;
 }
 
+// Vertical gap between tiles as a fraction of the column width (matches .arctic-block margin-top in the CSS).
+const TILE_GAP = 0.025;
+
 export class ArcticMasonry {
   #root; #columnsEl; #footer; #status; #button; #sentinel; #images; #batchSize; #breakpoints;
-  #columns = []; #tiles = []; #count = 0; #columnCount = 0; #resizeObserver; #intersectionObserver;
+  #columns = []; #heights = []; #tiles = []; #count = 0; #columnCount = 0; #resizeObserver; #intersectionObserver;
 
   constructor(container, { images = [], batchSize = 15, breakpoints = DEFAULT_BREAKPOINTS } = {}) {
     if (!(container instanceof Element)) throw new TypeError('ArcticMasonry needs a container element');
@@ -90,7 +93,7 @@ export class ArcticMasonry {
     for (; this.#count < end; this.#count++) {
       const tile = this.#createTile(this.#images[this.#count]);
       this.#tiles.push(tile);
-      this.#place(tile, this.#tiles.length - 1);
+      this.#place(tile);
     }
     this.#publish();
     return added;
@@ -108,7 +111,9 @@ export class ArcticMasonry {
   #createTile({ src, alt = '', width, height }) {
     const block = document.createElement('div');
     block.className = 'arctic-block';
-    if (width && height) block.style.aspectRatio = `${width} / ${height}`;
+    const ratio = width && height ? height / width : 0.75;   // height / width; 4:3 landscape if unknown
+    block.dataset.ratio = String(ratio);
+    block.style.aspectRatio = `1 / ${ratio}`;
     const img = document.createElement('img');
     img.alt = alt;
     img.decoding = 'async';
@@ -119,9 +124,14 @@ export class ArcticMasonry {
     return block;
   }
 
-  // Round-robin placement: tile i goes to column i % columnCount.
-  #place(tile, index) {
-    this.#columns[index % this.#columnCount].append(tile);
+  // Shortest-column placement: each tile goes to the column that is currently shortest (lowest index on
+  // ties). Heights are tracked in units of the column width, from each tile's aspect ratio, so this
+  // works before the images have loaded.
+  #place(tile) {
+    let shortest = 0;
+    for (let i = 1; i < this.#heights.length; i++) if (this.#heights[i] < this.#heights[shortest]) shortest = i;
+    this.#columns[shortest].append(tile);
+    this.#heights[shortest] += Number(tile.dataset.ratio) + TILE_GAP;
   }
 
   #layout(columnCount) {
@@ -133,7 +143,8 @@ export class ArcticMasonry {
       this.#columnsEl.append(column);
       return column;
     });
-    this.#tiles.forEach((tile, i) => this.#place(tile, i));
+    this.#heights = new Array(columnCount).fill(0);
+    this.#tiles.forEach((tile) => this.#place(tile));
     this.#publish();
   }
 

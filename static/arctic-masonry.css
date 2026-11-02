@@ -30,7 +30,7 @@ body {
 .arctic-column { flex: 1 1 0; min-width: 0; }
 
 .arctic-block {
-  margin-top: 2.5%;
+  margin-top: 2.5%;   /* keep in sync with TILE_GAP in arctic-masonry.js */
   border: 1px solid #d0d0d0;
   overflow: hidden;
   background: #ececec;
