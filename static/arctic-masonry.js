@@ -7,6 +7,9 @@
  *   });
  *
  * Options: images (required), batchSize (default 15), breakpoints ([[minWidthPx, columns], ...]).
+ *
+ * More images load when the bottom of the gallery scrolls into view, and a "Load more" button is always
+ * available as a keyboard/screen-reader fallback.
  */
 
 // [minimum container width in px, number of columns]; the last entry whose minimum fits wins.
@@ -22,8 +25,8 @@ export function columnCountFor(width, breakpoints = DEFAULT_BREAKPOINTS) {
 }
 
 export class ArcticMasonry {
-  #root; #columnsEl; #images; #batchSize; #breakpoints;
-  #columns = []; #tiles = []; #count = 0; #columnCount = 0; #resizeObserver;
+  #root; #columnsEl; #footer; #status; #button; #sentinel; #images; #batchSize; #breakpoints;
+  #columns = []; #tiles = []; #count = 0; #columnCount = 0; #resizeObserver; #intersectionObserver;
 
   constructor(container, { images = [], batchSize = 15, breakpoints = DEFAULT_BREAKPOINTS } = {}) {
     if (!(container instanceof Element)) throw new TypeError('ArcticMasonry needs a container element');
@@ -37,6 +40,22 @@ export class ArcticMasonry {
     this.#columnsEl.className = 'arctic-columns';
     this.#root.append(this.#columnsEl);
 
+    this.#footer = document.createElement('div');
+    this.#footer.className = 'arctic-footer';
+    this.#status = document.createElement('p');
+    this.#status.className = 'arctic-status';
+    this.#status.setAttribute('role', 'status');   // announces "Showing x of y" politely
+    this.#status.tabIndex = -1;                    // receives focus when the button disappears
+    this.#button = document.createElement('button');
+    this.#button.type = 'button';
+    this.#button.className = 'arctic-more';
+    this.#button.textContent = 'Load more';
+    this.#button.addEventListener('click', () => this.loadMore());
+    this.#sentinel = document.createElement('div');
+    this.#sentinel.className = 'arctic-sentinel';
+    this.#footer.append(this.#status, this.#button, this.#sentinel);
+    this.#root.append(this.#footer);
+
     this.#layout(columnCountFor(this.#root.clientWidth, this.#breakpoints));
     this.loadMore();
     requestAnimationFrame(() => this.#columnsEl.classList.add('is-ready'));
@@ -46,6 +65,17 @@ export class ArcticMasonry {
       if (next !== this.#columnCount) this.#layout(next);
     });
     this.#resizeObserver.observe(this.#root);
+
+    // Scroll-triggered loading: when the sentinel (bottom of the gallery) comes into view, load a batch.
+    this.#intersectionObserver = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && this.hasMore) {
+        this.loadMore();
+        // Still in view (short page / big batch)? Re-observe so we get another callback.
+        this.#intersectionObserver.unobserve(this.#sentinel);
+        this.#intersectionObserver.observe(this.#sentinel);
+      }
+    }, { rootMargin: '300px 0px' });
+    this.#intersectionObserver.observe(this.#sentinel);
   }
 
   get columnCount() { return this.#columnCount; }
@@ -68,7 +98,9 @@ export class ArcticMasonry {
 
   destroy() {
     this.#resizeObserver.disconnect();
+    this.#intersectionObserver.disconnect();
     this.#columnsEl.remove();
+    this.#footer.remove();
     this.#root.classList.remove('arctic');
     delete this.#root.dataset.columns; delete this.#root.dataset.loaded; delete this.#root.dataset.total;
   }
@@ -106,6 +138,10 @@ export class ArcticMasonry {
   }
 
   #publish() {
+    this.#status.textContent = `Showing ${this.#count} of ${this.#images.length} images`;
+    const hadFocus = document.activeElement === this.#button;
+    this.#button.hidden = !this.hasMore;
+    if (hadFocus && !this.hasMore) this.#status.focus();   // don't drop keyboard focus onto <body>
     this.#root.dataset.columns = String(this.#columnCount);
     this.#root.dataset.loaded = String(this.#count);
     this.#root.dataset.total = String(this.#images.length);

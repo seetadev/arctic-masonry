@@ -62,3 +62,4 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .arctic-columns, .arctic-block { transition: none; transform: none; }
 }
+.arctic-status:focus { outline: none; }
