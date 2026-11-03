@@ -1,0 +1,14 @@
+.git
+.github
+.env
+.env.*
+node_modules
+tests
+tools
+docs
+test-results
+playwright-report
+**/__pycache__
+*.md
+Dockerfile
+docker-compose.yml

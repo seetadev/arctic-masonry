@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: pytest (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -v
+
+  e2e:
+    name: Playwright (Chromium and Firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: pip install -r requirements.txt
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
+      - run: npm ci
+      - run: npm audit
+
+  docker:
+    name: docker build + container browser flow
+    runs-on: ubuntu-latest
+    env:
+      HOST_PORT: "8888"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build and start (waits for the healthcheck)
+        run: docker compose up -d --build --wait
+      - name: Container runs as non-root with a read-only filesystem
+        run: |
+          test "$(docker compose exec -T masonry id -u)" != "0"
+          ! docker compose exec -T masonry sh -c 'touch /app/x'
+      - name: Text assets are served compressed; traversal is refused
+        run: |
+          for p in / /arctic-masonry.js /arctic-masonry.css /images.json; do
+            curl -s -D- -o /dev/null -H 'Accept-Encoding: gzip' "http://localhost:8888$p" | grep -i 'content-encoding: gzip'
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is http://localhost:8888/../run.py)" = "403"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Playwright (Chromium and Firefox) against the container
+        run: E2E_NO_SERVER=1 E2E_PORT=8888 npx playwright test
+      - name: Container logs
+        if: failure()
+        run: docker compose logs
+      - run: docker compose down

@@ -1,21 +1,36 @@
+"""Small Tornado server for the Arctic Masonry demo: python run.py [port]   (or set PORT; default 8888)."""
+import asyncio
 import os
+import sys
+from pathlib import Path
 
-import tornado
-from tornado.httpserver import HTTPServer
-from tornado.web import Application, RequestHandler
-from tornado.ioloop import IOLoop
+import tornado.web
 
-rootdirectorypath = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ))
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
-def run(port):
-    app = Application([(r"/(.*)", tornado.web.StaticFileHandler, {"path": rootdirectorypath + "/arctic-masonry/static/"})],
-                      debug=False)
-    print rootdirectorypath
-    server = HTTPServer(app)
-    server.bind(port)
-    server.start(1)
-    print 'Arctic running at ' + str(port)
-    tornado.ioloop.IOLoop.instance().start()
+def make_app():
+    return tornado.web.Application(
+        [(r"/(.*)", tornado.web.StaticFileHandler, {"path": str(STATIC_DIR), "default_filename": "index.html"})],
+        compress_response=True,
+        debug=False,
+    )
 
-run(8888)
+
+async def serve(port):
+    make_app().listen(port)
+    print("Arctic Masonry running at http://localhost:%d" % port)
+    await asyncio.Event().wait()
+
+
+def main():
+    raw = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PORT", "8888")
+    try:
+        port = int(raw)
+    except ValueError:
+        sys.exit("Error: port must be a number, got %r" % raw)
+    asyncio.run(serve(port))
+
+
+if __name__ == "__main__":
+    main()
