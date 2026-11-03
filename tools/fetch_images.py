@@ -2,7 +2,7 @@
 """Download the demo images from Wikimedia Commons and (re)generate their metadata.
 
 Standard library only. For each title below it asks the Commons API for the licence and author,
-**refuses anything that is not Public domain or CC0**, downloads a 640 px wide thumbnail into
+**refuses anything that is not Public domain or CC0**, downloads a 500 px wide thumbnail into
 static/images/, and writes static/images.json (src/alt/width/height) and CREDITS.md (title, author,
 licence, source page). Re-run to regenerate:   python tools/fetch_images.py
 """
