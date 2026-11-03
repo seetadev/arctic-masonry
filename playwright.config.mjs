@@ -11,7 +11,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'], viewport: { width: 1280, height: 800 } } },
   ],
-  webServer: {
+  // E2E_NO_SERVER=1: test an already running server (the Docker container in CI) instead of starting run.py.
+  webServer: process.env.E2E_NO_SERVER ? undefined : {
     command: `${process.env.PYTHON || 'python'} run.py ${port}`,
     url: `http://localhost:${port}/`,
     reuseExistingServer: !process.env.CI,
