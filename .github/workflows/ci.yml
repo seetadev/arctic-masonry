@@ -92,6 +92,14 @@ jobs:
             curl -s -D- -o /dev/null -H 'Accept-Encoding: gzip' "http://localhost:8888$p" | grep -i 'content-encoding: gzip'
           done
           test "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is http://localhost:8888/../run.py)" = "403"
+      - name: Security headers are present, HSTS is off by default
+        run: |
+          h="$(curl -sI http://localhost:8888/)"
+          echo "$h"
+          echo "$h" | grep -i "^content-security-policy: default-src 'none'"
+          echo "$h" | grep -i '^x-content-type-options: nosniff'
+          ! echo "$h" | grep -i '^strict-transport-security'
+          ! echo "$h" | grep -i '^server:'
       - run: npm ci
       - run: npx playwright install --with-deps chromium firefox
       - name: Playwright (Chromium and Firefox) against the container

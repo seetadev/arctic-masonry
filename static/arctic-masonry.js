@@ -27,6 +27,16 @@ export function columnCountFor(width, breakpoints = DEFAULT_BREAKPOINTS) {
 // Vertical gap between tiles as a fraction of the column width (matches .arctic-block margin-top in the CSS).
 const TILE_GAP = 0.025;
 
+/** Only http(s), blob: and data:image/* URLs (or relative paths) are accepted as image sources. */
+export function isSafeImageSrc(src) {
+  try {
+    const url = new URL(String(src), document.baseURI);
+    return ['http:', 'https:', 'blob:'].includes(url.protocol) || /^data:image\/(png|jpe?g|gif|webp|avif);/i.test(url.href);
+  } catch {
+    return false;
+  }
+}
+
 export class ArcticMasonry {
   #root; #columnsEl; #footer; #status; #button; #sentinel; #images; #batchSize; #breakpoints;
   #columns = []; #heights = []; #tiles = []; #count = 0; #columnCount = 0; #resizeObserver; #intersectionObserver;
@@ -119,7 +129,8 @@ export class ArcticMasonry {
     img.decoding = 'async';
     img.addEventListener('load', () => block.classList.add('is-loaded'));
     img.addEventListener('error', () => block.classList.add('is-error'));
-    img.src = src;
+    if (isSafeImageSrc(src)) img.src = src;
+    else block.classList.add('is-error');           // never hand a javascript:/data:text/html URL to the page
     block.append(img);
     return block;
   }
