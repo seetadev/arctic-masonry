@@ -1,0 +1,25 @@
+services:
+  masonry:
+    build: .
+    image: arctic-masonry:local
+    environment:
+      PORT: "8888"
+      # HSTS is OFF unless you set a max-age (seconds). Only enable it behind a TLS-terminating proxy, and add
+      # HSTS_INCLUDE_SUBDOMAINS=1 only if every subdomain is HTTPS (a long max-age cannot be undone remotely).
+      HSTS_SECONDS: "${HSTS_SECONDS:-}"
+      HSTS_INCLUDE_SUBDOMAINS: "${HSTS_INCLUDE_SUBDOMAINS:-}"
+    ports:
+      - "${HOST_PORT:-8888}:8888"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8888/', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
