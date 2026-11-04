@@ -4,7 +4,7 @@ Status: **planning + scaffold only.** `integrations/helia.py` is a tested client
 
 The demo never embeds Helia. It calls the **Helia sidecar** (`meshkit-sidecar-helia`, in `seetadev/Tornado-Backend-Stack`) over HTTP, **from the server**. The browser module stays dependency-free and never sees the sidecar or its secret.
 
-## The sidecar contract (read from the source at commit `8afe218`, then confirmed by running it)
+## The sidecar contract (read from the source at commit `8afe218`, confirmed by running it, and re-verified at `a114973`)
 
 | Call | Behaviour |
 |---|---|
@@ -16,7 +16,7 @@ The demo never embeds Helia. It calls the **Helia sidecar** (`meshkit-sidecar-he
 
 Verified against the real sidecar (`tests/integration/test_helia_real.py`): a small payload gets the raw-leaf `CIDv1` (`bafkrei...`) equal to `sha2-256` computed locally, identical bytes give identical CIDs, an unknown CID gives `504` after 5.0 s, 413 at limit + 1, 400 for malformed CIDs, 401 without the token except on `/health`. Not in the sidecar: **delete**, per-user ownership, and (offline mode) replication.
 
-**Sidecar bug found while testing (commit `8afe218`):** `POST /upload` **without a `Content-Type` header** is answered `200` with the CID of an *empty* file (`bafkreihdwdcef...`) and **nothing is stored** (the body is never parsed, so the size limit is not enforced either). Clients must always send `Content-Type: application/octet-stream`; `HeliaClient` and the Tornado proxy do. An `xfail` integration test documents the desired behaviour and flips to XPASS when it is fixed upstream.
+**Sidecar bug found while testing, now fixed (commit `8afe218` had it):** `POST /upload` **without a `Content-Type` header** was answered `200` with the CID of an *empty* file and **nothing was stored** (and the size limit was skipped). Fixed in [Tornado-Backend-Stack#15](https://github.com/seetadev/Tornado-Backend-Stack/pull/15) (`a114973`): a missing `Content-Type` is treated as `application/octet-stream` and an empty body is a `400`. The clients here always send `Content-Type: application/octet-stream` anyway, so they work against both. The integration test for it is `xfail` (`todo` in the add-on): it fails against an old sidecar without failing the run, and reports `XPASS` / passes against `a114973` (verified).
 
 Tornado-Backend-Stack's own `/meshkit-helia/*` proxy has **no caller authentication** (CORS only) and an open `/list`; do not point a browser at it for anything non-public. **Dependency:** the sidecar exists only in the open PR [seetadev/Tornado-Backend-Stack#15](https://github.com/seetadev/Tornado-Backend-Stack/pull/15) (private repository).
 
@@ -62,7 +62,7 @@ The local files stay the master. On `HeliaUnavailable` (502) or `HeliaTimeout` (
 
 ```bash
 git clone git@github.com:seetadev/Tornado-Backend-Stack.git ../Tornado-Backend-Stack
-git -C ../Tornado-Backend-Stack checkout 8afe218
+git -C ../Tornado-Backend-Stack checkout a114973
 export HELIA_SIDECAR_BUILD_CONTEXT=$PWD/../Tornado-Backend-Stack/meshkit-sidecar-helia
 export HELIA_SIDECAR_SECRET=$(openssl rand -hex 32)
 docker compose -f tests/integration/docker-compose.helia.yml up -d --build --wait
