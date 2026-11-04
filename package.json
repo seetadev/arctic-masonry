@@ -1,0 +1,9 @@
+{
+  "name": "arctic-masonry",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Responsive masonry layout as a dependency-free ES module, with a small demo server",
+  "engines": { "node": ">=22" },
+  "scripts": { "test:e2e": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.64.1" }
+}
